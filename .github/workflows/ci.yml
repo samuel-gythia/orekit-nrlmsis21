@@ -35,7 +35,7 @@ jobs:
       - name: Install Python build and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install setuptools wheel numpy jpype1 orekit-jpype pytest
+          python -m pip install --upgrade "setuptools>=77.0" wheel numpy jpype1 orekit-jpype pytest
 
       - name: Compile Java adapter (javac --release 17)
         shell: bash

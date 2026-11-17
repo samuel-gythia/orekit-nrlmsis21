@@ -48,6 +48,9 @@ EXPECTED_FORTRAN_FILES = (
 
 HAS_DEV_UPSTREAM = (REPO_ROOT / "external" / "NRLMSIS2.1" / "msis_calc.F90").is_file()
 HAS_GFORTRAN = shutil.which("gfortran") is not None
+HAS_GCC = shutil.which("gcc") is not None
+HAS_WIN_GNU_GEN = (sys.platform != "win32") or (shutil.which("ninja") is not None) or (shutil.which("mingw32-make") is not None)
+CAN_RUN_CMAKE_FORTRAN = HAS_GFORTRAN and HAS_GCC and HAS_WIN_GNU_GEN
 
 
 def _populate_nrlmsis_dir(dest: Path, *, include_parm: bool = True, include_license: bool = True, lic_name: str = "nrlmsis2.1_license.txt") -> Path:
@@ -99,7 +102,19 @@ def _temp_env(**updates: str | None):
 def _run_cmake_configure(
     build_dir: Path, extra_args: list[str], env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess:
-    cmd = ["cmake", "-S", str(REPO_ROOT), "-B", str(build_dir)] + extra_args
+    cmd = ["cmake", "-S", str(REPO_ROOT), "-B", str(build_dir)]
+    if sys.platform == "win32":
+        if shutil.which("ninja"):
+            cmd.extend(["-G", "Ninja"])
+        elif shutil.which("mingw32-make"):
+            cmd.extend(["-G", "MinGW Makefiles"])
+        gcc = shutil.which("gcc")
+        gfortran = shutil.which("gfortran")
+        if gcc:
+            cmd.append(f"-DCMAKE_C_COMPILER={Path(gcc).as_posix()}")
+        if gfortran:
+            cmd.append(f"-DCMAKE_Fortran_COMPILER={Path(gfortran).as_posix()}")
+    cmd.extend(extra_args)
     return subprocess.run(
         cmd,
         cwd=REPO_ROOT,
@@ -208,7 +223,7 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             self.assertEqual(len(jars), 1)
             self.assertTrue(Path(jars[0]).exists())
 
-    @unittest.skipUnless(HAS_GFORTRAN, "Requires gfortran toolchain on PATH for CMake configure")
+    @unittest.skipUnless(CAN_RUN_CMAKE_FORTRAN, "Requires gcc, gfortran, and Ninja/MinGW Makefiles on PATH")
     def test_06_cmake_valid_user_supplied_source_dir_and_8_files(self) -> None:
         """CMake configures cleanly with a user-supplied NRLMSIS21_SOURCE_DIR and discovers all 8 .F90 files."""
         with tempfile.TemporaryDirectory() as td:
@@ -245,7 +260,7 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
                     msg=f"Expected source file {expected_ref} not found in CMake build graph",
                 )
 
-    @unittest.skipUnless(HAS_GFORTRAN, "Requires gfortran toolchain on PATH for CMake configure")
+    @unittest.skipUnless(CAN_RUN_CMAKE_FORTRAN, "Requires gcc, gfortran, and Ninja/MinGW Makefiles on PATH")
     def test_07_cmake_invalid_source_dirs_fail_clearly(self) -> None:
         """CMake fails with clear errors for nonexistent dir, missing .F90 file, or corrupt module."""
         with tempfile.TemporaryDirectory() as td:

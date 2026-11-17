@@ -71,10 +71,16 @@ def build_native_library(
     ]
     if shutil.which("ninja"):
         cmake_cmd.extend(["-G", "Ninja"])
+    elif sys.platform == "win32" and shutil.which("mingw32-make"):
+        cmake_cmd.extend(["-G", "MinGW Makefiles"])
     if c_compiler:
         cmake_cmd.append(f"-DCMAKE_C_COMPILER={c_compiler}")
+    elif sys.platform == "win32" and shutil.which("gcc"):
+        cmake_cmd.append(f"-DCMAKE_C_COMPILER={Path(shutil.which('gcc')).as_posix()}")
     if fortran_compiler:
         cmake_cmd.append(f"-DCMAKE_Fortran_COMPILER={fortran_compiler}")
+    elif sys.platform == "win32" and shutil.which("gfortran"):
+        cmake_cmd.append(f"-DCMAKE_Fortran_COMPILER={Path(shutil.which('gfortran')).as_posix()}")
 
     subprocess.run(cmake_cmd, check=True)
     subprocess.run(
