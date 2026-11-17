@@ -1,0 +1,38 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.ssa</groupId>
+    <artifactId>orekit-nrlmsis21</artifactId>
+    <version>1.0.2</version>
+    <packaging>jar</packaging>
+
+    <name>Orekit NRLMSIS 2.1 Native Adapter</name>
+    <description>NRLMSIS 2.1 Native JNI Integration for Orekit Atmosphere Interface</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <orekit.version>13.1.9</orekit.version>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>orekit</id>
+            <name>Orekit Releases</name>
+            <url>https://packages.orekit.org/repository/maven-releases/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.orekit</groupId>
+            <artifactId>orekit</artifactId>
+            <version>${orekit.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

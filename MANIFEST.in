@@ -1,0 +1,43 @@
+# Source-wrapper distribution manifest for orekit-nrlmsis21.
+#
+# Includes project-authored wrapper sources, build configuration, documentation,
+# and complete license/attribution notices (including NRL-SOF-014-1).
+# Excludes upstream NRLMSIS 2.1 Fortran sources, msis21.parm, and compiled binaries.
+
+include LICENSE
+include NOTICE
+include THIRD_PARTY_NOTICES.md
+include README.md
+include CONTRIBUTING.md
+include CMakeLists.txt
+include pom.xml
+include pyproject.toml
+include setup.py
+include build_dev.py
+
+recursive-include LICENSES *.txt *.md
+recursive-include docs *.md
+recursive-include native *.F90 *.h *.c
+recursive-include java *.java
+recursive-include python/orekit_nrlmsis21 *.py lib/orekit-nrlmsis21-1.0.2.jar nrlmsis2.1_license.txt
+include scripts/acquire_nrlmsis21.py
+recursive-include tests *.py
+
+# Exclude upstream NRLMSIS 2.1 Fortran sources, parameter file, and reference tables
+prune external
+recursive-exclude external *
+
+# Exclude compiled NRLMSIS 2.1 native binaries, legacy 1.0 JAR, and duplicate parameter files
+exclude python/orekit_nrlmsis21/lib/*.dll
+exclude python/orekit_nrlmsis21/lib/*.so*
+exclude python/orekit_nrlmsis21/lib/*.parm
+exclude python/orekit_nrlmsis21/lib/orekit-nrlmsis21-1.0.jar
+
+# Exclude local build outputs, wheels, datasets, diagnostic scripts, and compliance archives
+prune build
+prune dist
+prune target
+prune orekit-data
+prune audit_reports
+prune scripts/diagnostics
+prune release_compliance
