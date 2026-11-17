@@ -120,9 +120,12 @@ def find_native_library(lib_path: Optional[Union[str, os.PathLike]] = None) -> P
 
     pkg_lib = get_package_lib_dir()
     repo_root = Path(__file__).resolve().parents[2]
+    user_cache = Path.home() / ".orekit_nrlmsis21"
     candidates = [
         pkg_lib / lib_name,
         pkg_lib / alt_name,
+        user_cache / lib_name,
+        user_cache / alt_name,
         repo_root / "build" / "milestone2_c" / lib_name,
         repo_root / "build" / "linux" / lib_name,
         repo_root / "build" / lib_name,
@@ -184,6 +187,7 @@ def find_parameter_file(parm_path: Optional[Union[str, os.PathLike]] = None) -> 
 
     candidates.extend([
         pkg_lib / "msis21.parm",
+        Path.home() / ".orekit_nrlmsis21" / "msis21.parm",
         repo_root / "external" / "NRLMSIS2.1" / "msis21.parm",
     ])
 

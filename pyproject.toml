@@ -51,6 +51,9 @@ test = [
     "matplotlib>=3.5"
 ]
 
+[project.scripts]
+orekit-nrlmsis21-setup = "orekit_nrlmsis21.local_setup:main"
+
 [project.urls]
 Homepage = "https://github.com/samuel-gythia/orekit-nrlmsis21"
 Repository = "https://github.com/samuel-gythia/orekit-nrlmsis21"

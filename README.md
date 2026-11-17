@@ -53,12 +53,34 @@ User-Supplied Upstream NRLMSIS 2.1 (-DNRLMSIS21_SOURCE_DIR)
 
 ---
 
-## 4. User-Supplied Upstream Source Workflow
+## 4. User-Supplied Upstream Source Workflow (One-Step Setup)
 
-1. **Obtain NRLMSIS 2.1 Independently from NRL**:
-   Download `nrlmsis2.1.tar.gz` from the official NRL distribution page:  
-   `https://map.nrl.navy.mil/map/pub/nrl/NRLMSIS/NRLMSIS2.1/`
-2. **Extract & Validate Locally** (from an archive, official NRL download, or a cloned mirror/local directory):
+After installing the wrapper wheel (`pip install orekit_nrlmsis21-1.0.2-py3-none-any.whl`), users can acquire/verify NRLMSIS 2.1 and compile `libnrlmsis21_jni` locally into `~/.orekit_nrlmsis21/` in one step (requiring `gcc`, `gfortran`, `cmake`, and `JDK 17`):
+
+```bash
+# Option A: Interactive NRL download (prompts for explicit "YES" license acceptance) + local CMake build
+orekit-nrlmsis21-setup --download
+
+# Option B: From a manually downloaded nrlmsis2.1.tar.gz archive
+orekit-nrlmsis21-setup --from-archive /path/to/nrlmsis2.1.tar.gz
+
+# Option C: From an already cloned mirror or local NRLMSIS 2.1 directory
+orekit-nrlmsis21-setup --source-dir /path/to/nrlmsis21_mirror
+```
+
+On Windows PowerShell with MSYS2 UCRT64, pass `--c-compiler` and `--fortran-compiler`:
+```powershell
+$env:Path = "C:\msys64\ucrt64\bin;" + $env:Path
+orekit-nrlmsis21-setup --source-dir .\nrlmsis21_mirror `
+  --c-compiler C:/msys64/ucrt64/bin/gcc.exe `
+  --fortran-compiler C:/msys64/ucrt64/bin/gfortran.exe
+```
+
+Once complete, `orekit_nrlmsis21.loader` automatically discovers `~/.orekit_nrlmsis21/libnrlmsis21_jni.*` and `~/.orekit_nrlmsis21/msis21.parm` without extra environment variables.
+
+### Manual Acquisition & Verification Only
+1. **Official NRL distribution page**: `https://map.nrl.navy.mil/map/pub/nrl/NRLMSIS/NRLMSIS2.1/`
+2. **Extract or validate locally** (without building):
    ```bash
    python -m pip install --no-deps -e .
    # From a downloaded archive:

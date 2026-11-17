@@ -41,6 +41,7 @@ __pycache__/
 dist/
 .eggs/
 .pytest_cache/
+python/orekit_nrlmsis21/_native_src/
 
 # Audit, Diagnostics & Generated Exports
 audit_reports/

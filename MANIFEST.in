@@ -41,3 +41,4 @@ prune orekit-data
 prune audit_reports
 prune scripts/diagnostics
 prune release_compliance
+prune python/orekit_nrlmsis21/_native_src

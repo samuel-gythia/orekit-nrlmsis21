@@ -422,6 +422,34 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             self.assertEqual(called, [acquire.NRL_OFFICIAL_ARCHIVE_URL])
             self.assertEqual(len(acquire.validate_nrlmsis21_directory(dest)["fortran_files"]), 8)
 
+    def test_13_local_setup_bridge_discovery_and_user_home_fallback(self) -> None:
+        """local_setup locates CMake/native bridge sources and loader discovers ~/.orekit_nrlmsis21."""
+        from orekit_nrlmsis21 import local_setup
+
+        bridge_root = local_setup.find_native_bridge_source_root()
+        self.assertTrue((bridge_root / "CMakeLists.txt").is_file())
+        self.assertTrue((bridge_root / "native" / "nrlmsis21_c_api.F90").is_file())
+
+        with tempfile.TemporaryDirectory() as td:
+            fake_home = Path(td)
+            cache_dir = fake_home / ".orekit_nrlmsis21"
+            cache_dir.mkdir(parents=True)
+            lib_name = loader._get_platform_native_lib_name()
+            fake_lib = cache_dir / lib_name
+            fake_lib.write_bytes(b"FAKE_COMPILED_LIB")
+            fake_parm = cache_dir / "msis21.parm"
+            fake_parm.write_bytes(b"\x00" * loader.EXPECTED_PARM_BYTES)
+
+            old_home = Path.home
+            try:
+                Path.home = classmethod(lambda cls: fake_home)  # type: ignore[assignment]
+                with _temp_env(NRLMSIS21_LIB_PATH=None, NRLMSIS21_PARM_PATH=None, NRLMSIS21_SOURCE_DIR=None):
+                    if not HAS_DEV_UPSTREAM:
+                        self.assertEqual(loader.find_native_library(), fake_lib.resolve())
+                        self.assertEqual(loader.find_parameter_file(), fake_parm.resolve())
+            finally:
+                Path.home = old_home  # type: ignore[assignment]
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -53,14 +53,19 @@ jobs:
         run: |
           python -c "
           import zipfile, tarfile, glob
+          allowed_f90 = ('_native_src/native/nrlmsis21_c_api.f90',)
           whl = glob.glob('dist/*-py3-none-any.whl')[0]
           with zipfile.ZipFile(whl) as zf:
               for n in zf.namelist():
-                  assert not n.lower().endswith(('.f90', '.parm', '.dll')) and '.so' not in n.lower(), n
+                  nl = n.lower()
+                  if nl.endswith('.f90'):
+                      assert nl.endswith(allowed_f90), f'Unexpected .F90 in wheel: {n}'
+                  assert not nl.endswith(('.parm', '.dll')) and '.so' not in nl, n
           sdist = glob.glob('dist/*.tar.gz')[0]
           with tarfile.open(sdist, 'r:gz') as tf:
               for m in tf.getmembers():
-                  assert '/external/' not in m.name and not m.name.lower().endswith(('.parm', '.dll')) and '.so' not in m.name.lower(), m.name
+                  ml = m.name.lower()
+                  assert '/external/' not in ml and not ml.endswith(('.parm', '.dll')) and '.so' not in ml, m.name
           print('Verified wrapper-only release assets.')
           "
 

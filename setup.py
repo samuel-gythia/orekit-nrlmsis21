@@ -20,6 +20,7 @@ pyproject.toml. This file configures ``package_data`` and wheel tags for two sup
    ``py3-none-<platform>``.
 """
 import os
+import pathlib
 import shutil
 import sys
 
@@ -42,6 +43,18 @@ if WRAPPER_ONLY and os.path.exists("build/wrapper_only"):
 
 BUILD_OPTIONS = {"build": {"build_base": "build/wrapper_only"}} if WRAPPER_ONLY else {}
 
+# Stage CMakeLists.txt + native bridge sources into _native_src/ during wheel builds
+# so `orekit-nrlmsis21-setup` works from a pip-installed wheel without cloning the repo.
+_REPO_ROOT = pathlib.Path(__file__).resolve().parent
+_NATIVE_SRC_STAGE = _REPO_ROOT / "python" / "orekit_nrlmsis21" / "_native_src"
+if WRAPPER_ONLY and (_REPO_ROOT / "CMakeLists.txt").is_file() and (_REPO_ROOT / "native").is_dir():
+    if _NATIVE_SRC_STAGE.exists():
+        shutil.rmtree(_NATIVE_SRC_STAGE)
+    (_NATIVE_SRC_STAGE / "native").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_REPO_ROOT / "CMakeLists.txt", _NATIVE_SRC_STAGE / "CMakeLists.txt")
+    for _nf in ("nrlmsis21_c_api.F90", "nrlmsis21_c_api.h", "nrlmsis21_jni.c"):
+        shutil.copy2(_REPO_ROOT / "native" / _nf, _NATIVE_SRC_STAGE / "native" / _nf)
+
 
 class BinaryBdistWheel(_bdist_wheel):
     """Tags binary wheels ``py3-none-<platform>`` or wrapper-only wheels ``py3-none-any``."""
@@ -62,7 +75,11 @@ LICENSE_PATTERNS = ["nrlmsis2.1_license.txt", "LICENSE*"]
 
 if WRAPPER_ONLY:
     # Public source-wrapper distribution: exclude compiled native binaries, legacy 1.0 JAR, and msis21.parm
-    package_patterns = ["lib/orekit-nrlmsis21-1.0.2.jar"] + LICENSE_PATTERNS
+    package_patterns = [
+        "lib/orekit-nrlmsis21-1.0.2.jar",
+        "_native_src/CMakeLists.txt",
+        "_native_src/native/*",
+    ] + LICENSE_PATTERNS
     exclude_patterns = ["lib/*.dll", "lib/*.so*", "lib/*.parm", "lib/orekit-nrlmsis21-1.0.jar"]
 elif sys.platform == "win32":
     package_patterns = ["lib/*.dll", "lib/orekit-nrlmsis21-1.0.2.jar", "lib/*.parm"] + LICENSE_PATTERNS
