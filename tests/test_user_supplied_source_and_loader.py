@@ -231,11 +231,12 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             user_src = _populate_nrlmsis_dir(tmp_path / "user_nrlmsis21_src", include_parm=False, include_license=False)
 
             build_dir = tmp_path / "cmake_build_valid"
-            res = _run_cmake_configure(build_dir, [f"-DNRLMSIS21_SOURCE_DIR={user_src}"])
+            resolved_src = user_src.resolve()
+            res = _run_cmake_configure(build_dir, [f"-DNRLMSIS21_SOURCE_DIR={resolved_src}"])
             combined = (res.stdout or "") + "\n" + (res.stderr or "")
             self.assertEqual(res.returncode, 0, msg=f"CMake configure failed:\n{combined}")
             self.assertIn(
-                f"NRLMSIS 2.1 upstream Fortran source directory: {user_src.as_posix()}",
+                f"NRLMSIS 2.1 upstream Fortran source directory: {resolved_src.as_posix()}",
                 combined.replace("\\", "/"),
             )
 
@@ -253,7 +254,7 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             )
             self.assertIn("Discovered 8 upstream NRLMSIS 2.1 Fortran files:", normalized_gen)
             for fname in EXPECTED_FORTRAN_FILES:
-                expected_ref = f"{user_src.as_posix()}/{fname}"
+                expected_ref = f"{resolved_src.as_posix()}/{fname}"
                 self.assertIn(
                     expected_ref,
                     normalized_gen,
