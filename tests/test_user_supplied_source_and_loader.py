@@ -46,6 +46,37 @@ EXPECTED_FORTRAN_FILES = (
     "msis_calc.F90",
 )
 
+HAS_DEV_UPSTREAM = (REPO_ROOT / "external" / "NRLMSIS2.1" / "msis_calc.F90").is_file()
+HAS_GFORTRAN = shutil.which("gfortran") is not None
+
+
+def _populate_nrlmsis_dir(dest: Path, *, include_parm: bool = True, include_license: bool = True, lic_name: str = "nrlmsis2.1_license.txt") -> Path:
+    """Copies external/NRLMSIS2.1 if present, otherwise creates minimal valid synthetic fixtures for CI."""
+    dest.mkdir(parents=True, exist_ok=True)
+    dev_dir = REPO_ROOT / "external" / "NRLMSIS2.1"
+    if HAS_DEV_UPSTREAM:
+        for fname in EXPECTED_FORTRAN_FILES:
+            shutil.copy2(dev_dir / fname, dest / fname)
+        if include_parm:
+            shutil.copy2(dev_dir / "msis21.parm", dest / "msis21.parm")
+        if include_license:
+            shutil.copy2(dev_dir / "nrlmsis2.1_license.txt", dest / lic_name)
+        return dest
+
+    for fname in EXPECTED_FORTRAN_FILES:
+        stem = Path(fname).stem
+        if fname == "msis_gtd8d.F90":
+            body = "subroutine gtd8d()\nend subroutine gtd8d\n"
+        else:
+            body = f"module {stem}\nend module {stem}\n"
+        (dest / fname).write_text(body, encoding="utf-8")
+    if include_parm:
+        (dest / "msis21.parm").write_bytes(b"\x00" * loader.EXPECTED_PARM_BYTES)
+    if include_license:
+        pkg_lic = REPO_ROOT / "python" / "orekit_nrlmsis21" / "nrlmsis2.1_license.txt"
+        (dest / lic_name).write_bytes(pkg_lic.read_bytes())
+    return dest
+
 
 @contextmanager
 def _temp_env(**updates: str | None):
@@ -164,6 +195,7 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "expected 536576 bytes"):
                     loader.find_parameter_file()
 
+    @unittest.skipUnless(HAS_DEV_UPSTREAM, "Requires local development checkout with external/NRLMSIS2.1")
     def test_05_loader_default_development_fallback_resolution(self) -> None:
         """Without env overrides, development checkout resolves existing library and msis21.parm."""
         with _temp_env(NRLMSIS21_LIB_PATH=None, NRLMSIS21_PARM_PATH=None, NRLMSIS21_SOURCE_DIR=None):
@@ -176,16 +208,12 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             self.assertEqual(len(jars), 1)
             self.assertTrue(Path(jars[0]).exists())
 
+    @unittest.skipUnless(HAS_GFORTRAN, "Requires gfortran toolchain on PATH for CMake configure")
     def test_06_cmake_valid_user_supplied_source_dir_and_8_files(self) -> None:
         """CMake configures cleanly with a user-supplied NRLMSIS21_SOURCE_DIR and discovers all 8 .F90 files."""
         with tempfile.TemporaryDirectory() as td:
             tmp_path = Path(td)
-            user_src = tmp_path / "user_nrlmsis21_src"
-            user_src.mkdir(parents=True)
-            upstream_dev_dir = REPO_ROOT / "external" / "NRLMSIS2.1"
-
-            for fname in EXPECTED_FORTRAN_FILES:
-                shutil.copy2(upstream_dev_dir / fname, user_src / fname)
+            user_src = _populate_nrlmsis_dir(tmp_path / "user_nrlmsis21_src", include_parm=False, include_license=False)
 
             build_dir = tmp_path / "cmake_build_valid"
             res = _run_cmake_configure(build_dir, [f"-DNRLMSIS21_SOURCE_DIR={user_src}"])
@@ -217,11 +245,11 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
                     msg=f"Expected source file {expected_ref} not found in CMake build graph",
                 )
 
+    @unittest.skipUnless(HAS_GFORTRAN, "Requires gfortran toolchain on PATH for CMake configure")
     def test_07_cmake_invalid_source_dirs_fail_clearly(self) -> None:
         """CMake fails with clear errors for nonexistent dir, missing .F90 file, or corrupt module."""
         with tempfile.TemporaryDirectory() as td:
             tmp_path = Path(td)
-            upstream_dev_dir = REPO_ROOT / "external" / "NRLMSIS2.1"
 
             # Case A: Non-existent directory
             bad_dir = tmp_path / "nonexistent_nrlmsis_dir"
@@ -233,11 +261,8 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             self.assertIn("NRLMSIS21_SOURCE_DIR does not exist or is not a directory", out_a)
 
             # Case B: Missing one of the 8 required .F90 files (msis_calc.F90)
-            incomplete_src = tmp_path / "incomplete_src"
-            incomplete_src.mkdir(parents=True)
-            for fname in EXPECTED_FORTRAN_FILES:
-                if fname != "msis_calc.F90":
-                    shutil.copy2(upstream_dev_dir / fname, incomplete_src / fname)
+            incomplete_src = _populate_nrlmsis_dir(tmp_path / "incomplete_src", include_parm=False, include_license=False)
+            (incomplete_src / "msis_calc.F90").unlink()
             res_b = _run_cmake_configure(
                 tmp_path / "build_b", [f"-DNRLMSIS21_SOURCE_DIR={incomplete_src}"]
             )
@@ -247,10 +272,7 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             self.assertIn("msis_calc.F90", out_b)
 
             # Case C: Corrupted module declaration inside msis_dfn.F90
-            corrupt_src = tmp_path / "corrupt_src"
-            corrupt_src.mkdir(parents=True)
-            for fname in EXPECTED_FORTRAN_FILES:
-                shutil.copy2(upstream_dev_dir / fname, corrupt_src / fname)
+            corrupt_src = _populate_nrlmsis_dir(tmp_path / "corrupt_src", include_parm=False, include_license=False)
             (corrupt_src / "msis_dfn.F90").write_text("! missing module declaration\n", encoding="utf-8")
             res_c = _run_cmake_configure(
                 tmp_path / "build_c", [f"-DNRLMSIS21_SOURCE_DIR={corrupt_src}"]
@@ -260,6 +282,7 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
             self.assertIn("Upstream source validation failed", out_c)
             self.assertIn("msis_dfn.F90", out_c)
 
+    @unittest.skipUnless(HAS_DEV_UPSTREAM and HAS_GFORTRAN, "Requires local development checkout with external/NRLMSIS2.1 and gfortran")
     def test_08_cmake_default_development_source_dir_resolution(self) -> None:
         """Without -DNRLMSIS21_SOURCE_DIR, CMake resolves external/NRLMSIS2.1 by default."""
         with tempfile.TemporaryDirectory() as td:
@@ -311,43 +334,35 @@ class TestUserSuppliedSourceAndLoader(unittest.TestCase):
 
     def _make_synthetic_nrl_tar_bytes(self, include_trailing_dot_lic: bool = False) -> bytes:
         buf = io.BytesIO()
-        upstream_dev_dir = REPO_ROOT / "external" / "NRLMSIS2.1"
-        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
-            for fname in EXPECTED_FORTRAN_FILES:
-                tf.add(upstream_dev_dir / fname, arcname=f"NRLMSIS2.1/{fname}")
-            tf.add(upstream_dev_dir / "msis21.parm", arcname="NRLMSIS2.1/msis21.parm")
-            lic_name = "nrlmsis2.1_license..txt" if include_trailing_dot_lic else "nrlmsis2.1_license.txt"
-            tf.add(upstream_dev_dir / "nrlmsis2.1_license.txt", arcname=f"NRLMSIS2.1/{lic_name}")
+        lic_name = "nrlmsis2.1_license..txt" if include_trailing_dot_lic else "nrlmsis2.1_license.txt"
+        with tempfile.TemporaryDirectory() as td:
+            src_dir = _populate_nrlmsis_dir(Path(td) / "src", lic_name=lic_name)
+            with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+                for fname in EXPECTED_FORTRAN_FILES:
+                    tf.add(src_dir / fname, arcname=f"NRLMSIS2.1/{fname}")
+                tf.add(src_dir / "msis21.parm", arcname="NRLMSIS2.1/msis21.parm")
+                tf.add(src_dir / lic_name, arcname=f"NRLMSIS2.1/{lic_name}")
         return buf.getvalue()
 
     def test_10_acquire_validate_directory_success_and_missing_failures(self) -> None:
         """validate_nrlmsis21_directory passes on complete dir and fails clearly on missing/corrupt files."""
-        upstream_dev_dir = REPO_ROOT / "external" / "NRLMSIS2.1"
-        info = acquire.validate_nrlmsis21_directory(upstream_dev_dir)
-        self.assertEqual(len(info["fortran_files"]), 8)
-        self.assertEqual(info["parm_file"].stat().st_size, acquire.EXPECTED_PARM_BYTES)
-        self.assertTrue(info["license_file"].exists())
-
         with tempfile.TemporaryDirectory() as td:
             tmp_path = Path(td)
+            valid_dir = _populate_nrlmsis_dir(tmp_path / "valid_nrl")
+            info = acquire.validate_nrlmsis21_directory(valid_dir)
+            self.assertEqual(len(info["fortran_files"]), 8)
+            self.assertEqual(info["parm_file"].stat().st_size, acquire.EXPECTED_PARM_BYTES)
+            self.assertTrue(info["license_file"].exists())
+
             # Missing msis_calc.F90
-            d_miss = tmp_path / "missing_f90"
-            d_miss.mkdir()
-            for fname in EXPECTED_FORTRAN_FILES:
-                if fname != "msis_calc.F90":
-                    shutil.copy2(upstream_dev_dir / fname, d_miss / fname)
-            shutil.copy2(upstream_dev_dir / "msis21.parm", d_miss / "msis21.parm")
-            shutil.copy2(upstream_dev_dir / "nrlmsis2.1_license.txt", d_miss / "nrlmsis2.1_license.txt")
+            d_miss = _populate_nrlmsis_dir(tmp_path / "missing_f90")
+            (d_miss / "msis_calc.F90").unlink()
             with self.assertRaisesRegex(FileNotFoundError, "msis_calc.F90"):
                 acquire.validate_nrlmsis21_directory(d_miss)
 
             # Wrong-size msis21.parm
-            d_bad_parm = tmp_path / "bad_parm"
-            d_bad_parm.mkdir()
-            for fname in EXPECTED_FORTRAN_FILES:
-                shutil.copy2(upstream_dev_dir / fname, d_bad_parm / fname)
+            d_bad_parm = _populate_nrlmsis_dir(tmp_path / "bad_parm")
             (d_bad_parm / "msis21.parm").write_bytes(b"short")
-            shutil.copy2(upstream_dev_dir / "nrlmsis2.1_license.txt", d_bad_parm / "nrlmsis2.1_license.txt")
             with self.assertRaisesRegex(ValueError, "536576"):
                 acquire.validate_nrlmsis21_directory(d_bad_parm)
 

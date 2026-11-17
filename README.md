@@ -58,15 +58,17 @@ User-Supplied Upstream NRLMSIS 2.1 (-DNRLMSIS21_SOURCE_DIR)
 1. **Obtain NRLMSIS 2.1 Independently from NRL**:
    Download `nrlmsis2.1.tar.gz` from the official NRL distribution page:  
    `https://map.nrl.navy.mil/map/pub/nrl/NRLMSIS/NRLMSIS2.1/`
-2. **Extract & Validate Locally** (without overwriting existing files):
+2. **Extract & Validate Locally** (from an archive, official NRL download, or a cloned mirror/local directory):
    ```bash
    python -m pip install --no-deps -e .
+   # From a downloaded archive:
    python -m orekit_nrlmsis21.acquire --from-archive /path/to/nrlmsis2.1.tar.gz --target-dir ./nrlmsis21_upstream
-   # Or interactive user-confirmed download (prompts for explicit "YES"):
+   # Or interactive user-confirmed download from NRL (prompts for explicit "YES"):
    python -m orekit_nrlmsis21.acquire --download --target-dir ./nrlmsis21_upstream
-   # Or validate an existing local folder:
-   python -m orekit_nrlmsis21.acquire --verify --target-dir ./nrlmsis21_upstream
+   # Or validate an existing local folder / cloned mirror containing the 8 .F90 files + msis21.parm:
+   python -m orekit_nrlmsis21.acquire --verify --target-dir /path/to/nrlmsis21_mirror
    ```
+   *(If using an existing cloned mirror directory, simply point `-DNRLMSIS21_SOURCE_DIR=/path/to/nrlmsis21_mirror` and `NRLMSIS21_PARM_PATH=/path/to/nrlmsis21_mirror/msis21.parm` at the subfolder containing the 8 `.F90` files and `msis21.parm`.)*
 
 ---
 
